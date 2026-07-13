@@ -4,4 +4,7 @@ matplotlib
 seaborn
 scikit-learn
 Flask
+psycopg2-binary
+sqlalchemy
+python-dotenv
 -e .
