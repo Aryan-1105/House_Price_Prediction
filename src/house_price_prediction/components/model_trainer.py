@@ -360,34 +360,57 @@ class ModelTrainer:
             test_rmse = np.sqrt(mean_squared_error(y_test, predicted_price_test))
 
             # =========================================================
-            # 14. Final performance report
+            # 14. FINAL MODEL PERFORMANCE REPORT
             # =========================================================
 
             print("\n")
-            print("=" * 75)
-            print("FINAL MODEL PERFORMANCE")
-            print("=" * 75)
+            print("=" * 85)
+            print("FINAL MODEL PERFORMANCE REPORT")
+            print("=" * 85)
 
-            print(f"Model        : " f"{final_model_name}")
+            print(f"Selected Model : {final_model_name}")
+            print(f"CV R² (Log)    : {final_cv_r2:.4f}")
+            print(f"Train R²       : {train_r2:.4f}")
+            print(f"Test R²        : {test_r2:.4f}")
 
-            print(f"CV R2        : " f"{final_cv_r2:.4f}")
+            print(f"Train MAE      : ₹{train_mae:,.2f}")
+            print(f"Test MAE       : ₹{test_mae:,.2f}")
 
-            print(f"Train R2     : " f"{train_r2:.4f}")
+            print(f"Train RMSE     : ₹{train_rmse:,.2f}")
+            print(f"Test RMSE      : ₹{test_rmse:,.2f}")
 
-            print(f"Test R2      : " f"{test_r2:.4f}")
-
-            print(f"Train MAE    : " f"₹{train_mae:,.2f}")
-
-            print(f"Test MAE     : " f"₹{test_mae:,.2f}")
-
-            print(f"Train RMSE   : " f"₹{train_rmse:,.2f}")
-
-            print(f"Test RMSE    : " f"₹{test_rmse:,.2f}")
-
-            print("=" * 75)
+            print("=" * 85)
 
             # =========================================================
-            # 15. Save leaderboard
+            # 15. SAVE FINAL MODEL REPORT
+            # =========================================================
+
+            report_file_path = os.path.join("artifacts", "final_model_report.txt")
+
+            with open(report_file_path, "w", encoding="utf-8") as report:
+
+                report.write("=" * 85 + "\n")
+                report.write("FINAL MODEL PERFORMANCE REPORT\n")
+                report.write("=" * 85 + "\n\n")
+
+                report.write(f"Selected Model : {final_model_name}\n")
+                report.write(f"CV R² (Log)    : {final_cv_r2:.4f}\n")
+                report.write(f"Train R²       : {train_r2:.4f}\n")
+                report.write(f"Test R²        : {test_r2:.4f}\n\n")
+
+                report.write(f"Train MAE      : ₹{train_mae:,.2f}\n")
+                report.write(f"Test MAE       : ₹{test_mae:,.2f}\n\n")
+
+                report.write(f"Train RMSE     : ₹{train_rmse:,.2f}\n")
+                report.write(f"Test RMSE      : ₹{test_rmse:,.2f}\n")
+
+                report.write("\n" + "=" * 85 + "\n")
+
+            logging.info(f"Final model report saved to {report_file_path}")
+
+            print(f"\nFinal report saved: {report_file_path}")
+            # =========================================================
+            # 16. Save leaderboard
             # =========================================================
 
             os.makedirs("artifacts", exist_ok=True)
@@ -399,7 +422,7 @@ class ModelTrainer:
             logging.info("CV leaderboard saved successfully")
 
             # =========================================================
-            # 16. Save model
+            # 17. Save model
             # =========================================================
 
             save_object(
