@@ -1,8 +1,10 @@
 # House Price Prediction
 
-An end-to-end machine learning project for predicting house prices using a complete training and deployment pipeline.
+An end-to-end machine learning project for predicting house prices using a production-oriented training, evaluation, and deployment pipeline.
 
-The project reads housing data from PostgreSQL, performs feature engineering and preprocessing, compares multiple regression models using 5-fold cross-validation, tunes the best baseline model, saves the trained model and preprocessor, and exposes the prediction system through a Flask web application.
+The project ingests housing data from PostgreSQL, performs feature engineering and preprocessing, compares multiple regression models using 5-fold cross-validation, tunes the best-performing baseline model, serializes the final model and preprocessing pipeline, and exposes the prediction system through a Flask web application.
+
+![House Price Prediction](ScreenShots/house-price-prediction-banner.png)
 
 ---
 
@@ -10,7 +12,23 @@ The project reads housing data from PostgreSQL, performs feature engineering and
 
 This project demonstrates a complete machine learning workflow rather than a standalone notebook experiment.
 
-### Workflow
+The pipeline covers:
+
+* PostgreSQL data ingestion
+* Train/test splitting
+* Feature engineering
+* Data preprocessing
+* Target transformation
+* 5-fold cross-validation
+* Baseline model comparison
+* Hyperparameter tuning
+* Final model selection
+* Model and preprocessor serialization
+* Flask deployment
+* Docker support
+* CI workflow
+
+### End-to-End Workflow
 
 ```text
 PostgreSQL
@@ -22,6 +40,8 @@ Train / Test Split
 Feature Engineering
     ↓
 Data Preprocessing
+    ↓
+Target Transformation
     ↓
 5-Fold Cross-Validation
     ↓
@@ -36,39 +56,94 @@ Model + Preprocessor Serialization
 Flask Prediction Application
 ```
 
-The training pipeline is implemented through separate ingestion, transformation, and model-training components, coordinated by a dedicated training pipeline.
+The training workflow is divided into dedicated ingestion, transformation, and model-training components and coordinated through a training pipeline.
 
 ---
 
 ## Key Features
 
 * PostgreSQL-based data ingestion
+* Environment-based database configuration
 * Automated train/test splitting
-* Feature engineering
+* 12 original input features
+* 4 engineered features
+* 16 total features before one-hot encoding
 * Numerical imputation and standardization
 * Categorical imputation and one-hot encoding
-* 5-fold cross-validation
-* Multiple regression model comparison
-* Lasso hyperparameter tuning using `RandomizedSearchCV`
 * Log transformation of the target variable
+* 5-fold cross-validation
+* Comparison of 10 regression models
+* Lasso hyperparameter tuning using `RandomizedSearchCV`
 * Automatic inverse transformation of predictions
-* Saved model and preprocessing artifacts
-* Flask-based prediction interface
+* Serialized model and preprocessing artifacts
+* Flask prediction interface
 * Docker support
 * GitHub Actions CI workflow
 * DVC metadata for dataset tracking
+* Modular ML pipeline architecture
 
 ---
 
-## Machine Learning Pipeline
+# Dataset and Features
 
-### 1. Data Ingestion
+The project uses a housing dataset containing **12 original input features**.
 
-The project reads the dataset directly from PostgreSQL using SQLAlchemy and `psycopg2`.
+Four additional features are created through feature engineering, resulting in:
 
-Database credentials are loaded from environment variables rather than being hard-coded.
+```text
+12 Original Features
+        +
+4 Engineered Features
+        =
+16 Features
+```
 
-Required environment variables:
+The engineered features are created before preprocessing and model training.
+
+---
+
+## Feature Engineering
+
+The following four features are engineered:
+
+```text
+total_rooms
+area_per_bedroom
+area_per_bathroom
+amenity_count
+```
+
+### Feature Definitions
+
+```text
+total_rooms = bedrooms + bathrooms
+
+area_per_bedroom = area / bedrooms
+
+area_per_bathroom = area / bathrooms
+
+amenity_count =
+    mainroad
+  + guestroom
+  + basement
+  + hotwaterheating
+  + airconditioning
+  + prefarea
+```
+
+The feature-engineering logic is shared between training and inference so that the same transformations are applied when generating predictions.
+
+---
+
+# Machine Learning Pipeline
+
+## 1. Data Ingestion
+
+The project reads housing data directly from PostgreSQL using SQLAlchemy and a PostgreSQL database driver.
+
+Database credentials are loaded from environment variables rather than being hard-coded into the source code.
+
+### Required Environment Variables
 
 ```text
 DB_HOST
@@ -91,7 +166,9 @@ The ingestion component:
 
 ## 2. Feature Engineering
 
-The following engineered features are created:
+Feature engineering is performed consistently during both model training and prediction.
+
+The four engineered features are:
 
 ```text
 total_rooms
@@ -100,33 +177,15 @@ area_per_bathroom
 amenity_count
 ```
 
-### Feature definitions
-
-```text
-total_rooms = bedrooms + bathrooms
-
-area_per_bedroom = area / bedrooms
-
-area_per_bathroom = area / bathrooms
-
-amenity_count =
-    mainroad
-  + guestroom
-  + basement
-  + hotwaterheating
-  + airconditioning
-  + prefarea
-```
-
-The feature-engineering logic is shared between training and inference so that the same transformations are applied when making predictions.
+These features are designed to provide additional information about property size, room distribution, and available amenities.
 
 ---
 
 ## 3. Data Preprocessing
 
-### Numerical features
+The preprocessing pipeline uses separate transformations for numerical and categorical features.
 
-The numerical pipeline applies:
+### Numerical Pipeline
 
 ```text
 Median Imputation
@@ -148,9 +207,7 @@ area_per_bathroom
 amenity_count
 ```
 
-### Categorical features
-
-The categorical pipeline applies:
+### Categorical Pipeline
 
 ```text
 Most-Frequent Imputation
@@ -170,33 +227,45 @@ prefarea
 furnishingstatus
 ```
 
-The preprocessor is fitted on training data and then reused for the test set and future predictions.
+The preprocessing pipeline is fitted only on the training data and subsequently reused for:
+
+* Training transformations
+* Test transformations
+* Future inference
+
+This prevents inconsistent preprocessing between training and prediction.
 
 ---
 
-## 4. Target Transformation
+# Target Transformation
 
-Because house prices are positively skewed, the target is transformed using:
+House prices are positively skewed, so the target variable is transformed using a natural logarithmic transformation.
+
+During training:
 
 ```python
 y_train_log = np.log1p(y_train)
 ```
 
-Models are trained on the log-transformed price.
+Models are therefore trained to predict:
 
-During inference, predictions are converted back to the original price scale using:
-
-```python
-np.expm1(predicted_log_price)
+```text
+log1p(price)
 ```
 
-This same transformation logic is used in the prediction pipeline.
+During inference, the predicted value is converted back to the original price scale:
+
+```python
+predicted_price = np.expm1(predicted_log_price)
+```
+
+This allows the model to operate on a more stable target distribution while presenting predictions in the original currency scale.
 
 ---
 
 # Model Comparison
 
-The project evaluates the following baseline regression models:
+The project evaluates the following 10 baseline regression models:
 
 1. Linear Regression
 2. Ridge Regression
@@ -209,11 +278,27 @@ The project evaluates the following baseline regression models:
 9. XGBoost
 10. CatBoost
 
-Evaluation is performed using **5-fold cross-validation** with the log-transformed target.
+All models are evaluated using **5-fold cross-validation** on the log-transformed target.
+
+### Evaluation Metrics
+
+The primary model-selection metric is:
+
+```text
+R² on log-transformed target
+```
+
+Additional metrics include:
+
+```text
+CV R² Standard Deviation
+CV MAE on log-transformed target
+CV RMSE on log-transformed target
+```
 
 ---
 
-## Baseline Model Results
+# Baseline Model Results
 
 | Model                | CV R² (Log) | CV R² Std | CV MAE (Log) | CV RMSE (Log) |
 | -------------------- | ----------: | --------: | -----------: | ------------: |
@@ -228,36 +313,45 @@ Evaluation is performed using **5-fold cross-validation** with the log-transform
 | Extra Trees          |      0.5988 |    0.0393 |       0.1665 |        0.2209 |
 | Decision Tree        |      0.2639 |    0.1648 |       0.2265 |        0.2971 |
 
-The current baseline leaderboard is generated automatically and saved as:
+The cross-validation leaderboard is automatically generated and saved as:
 
 ```text
 artifacts/model_comparison_cv.csv
 ```
 
+### Best Baseline Model
+
+```text
+Model: Lasso Regression
+CV R² (Log): 0.6736
+```
+
+Lasso Regression achieved the highest mean cross-validation R² among the evaluated baseline models.
+
 ---
 
 # Hyperparameter Tuning
 
-Lasso Regression achieved the highest baseline cross-validation R².
+Since Lasso Regression achieved the highest baseline cross-validation performance, it was selected for hyperparameter tuning.
 
-Therefore, Lasso was selected for hyperparameter tuning using `RandomizedSearchCV`.
+`RandomizedSearchCV` was used to search for an improved value of the Lasso regularization parameter `alpha`.
 
-### Search space
+### Search Space
 
 ```python
 np.logspace(-5, 1, 50)
 ```
 
-### Search configuration
+### Search Configuration
 
 ```text
-Number of candidates: 30
+Candidates: 30
 Cross-validation folds: 5
 Scoring: R²
 Random state: 42
 ```
 
-### Tuning result
+### Tuning Results
 
 ```text
 Baseline Lasso CV R² : 0.6736
@@ -271,14 +365,36 @@ Best parameter:
 alpha = 0.0021209508879201904
 ```
 
-### Final selected model
+### Final Model
 
 ```text
 Tuned Lasso Regression
 CV R² (Log): 0.6755
 ```
 
-The tuning logic only replaces the baseline Lasso when the tuned configuration actually improves its cross-validation score.
+The tuning process only replaces the baseline Lasso model when the tuned configuration produces an improved cross-validation score.
+
+In this experiment, tuning produced a modest improvement of approximately **0.0019 CV R²**.
+
+---
+
+# Final Model Selection
+
+The final model selected by the pipeline is:
+
+```text
+Tuned Lasso Regression
+```
+
+Performance:
+
+```text
+5-Fold CV R² (Log): 0.6755
+```
+
+The final model is trained using the selected configuration and serialized together with the preprocessing pipeline.
+
+The prediction pipeline then loads these artifacts during inference.
 
 ---
 
@@ -298,33 +414,42 @@ artifacts/
 └── test.csv
 ```
 
-### Important files
+### Important Files
 
-**`model.pkl`**
+#### `model.pkl`
 
 Serialized final trained model.
 
-**`preprocessor.pkl`**
+#### `preprocessor.pkl`
 
 Serialized preprocessing pipeline used during training and prediction.
 
-**`model_comparison_cv.csv`**
+#### `model_comparison_cv.csv`
 
-5-fold cross-validation leaderboard.
+5-fold cross-validation leaderboard containing the baseline model comparison.
 
-**`final_model_report.txt`**
+#### `final_model_report.txt`
 
 Final model performance report generated after training.
 
-The prediction pipeline loads both `model.pkl` and `preprocessor.pkl` during inference.
+The prediction pipeline loads both:
+
+```text
+artifacts/model.pkl
+artifacts/preprocessor.pkl
+```
+
+during inference.
 
 ---
 
 # Web Application
 
-A Flask web application provides a simple interface for entering house characteristics and receiving an estimated house price.
+A Flask web application provides an interface for entering house characteristics and receiving an estimated house price.
 
-### Input features
+### Prediction Inputs
+
+The application accepts the following inputs:
 
 ```text
 Area
@@ -341,7 +466,7 @@ Preferred Area
 Furnishing Status
 ```
 
-The Flask application sends these inputs through the same feature engineering and preprocessing pipeline used during model training before generating the final prediction.
+The submitted values are passed through the same feature-engineering and preprocessing logic used during training before generating the final prediction.
 
 ---
 
@@ -357,7 +482,7 @@ The Flask application sends these inputs through the same feature engineering an
 
 ## Cross-Validation Leaderboard
 
-![CV Leaderboard](ScreenShots/03_CV_Leaderboard.png)
+![Cross-Validation Leaderboard](ScreenShots/03_CV_Leaderboard.png)
 
 ## Model Tuning and Final Selection
 
@@ -393,6 +518,7 @@ House_Price_Prediction/
 │       └── raw.csv
 │
 ├── ScreenShots/
+│   ├── house-price-prediction-banner.png
 │   ├── 01_Prediction_Form.png
 │   ├── 02_Prediction_Result.png
 │   ├── 03_CV_Leaderboard.png
@@ -425,14 +551,14 @@ House_Price_Prediction/
 
 # Installation
 
-## 1. Clone the repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Aryan-1105/House_Price_Prediction.git
 cd House_Price_Prediction
 ```
 
-## 2. Create a virtual environment
+## 2. Create a Virtual Environment
 
 ### Windows
 
@@ -448,13 +574,27 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-## 3. Install dependencies
+## 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-The project dependencies include pandas, NumPy, scikit-learn, Flask, SQLAlchemy, psycopg2, CatBoost, XGBoost, python-dotenv, dill, Matplotlib, and Seaborn.
+The project dependencies include libraries for:
+
+* Data processing
+* Machine learning
+* PostgreSQL connectivity
+* Flask
+* Model serialization
+* Visualization
+* Environment configuration
+
+The complete dependency list is maintained in:
+
+```text
+requirements.txt
+```
 
 ---
 
@@ -487,23 +627,24 @@ Run the complete training pipeline from the project root:
 python -m src.house_price_prediction.pipelines.training_pipeline
 ```
 
-The pipeline executes:
+The pipeline performs:
 
 ```text
 1. PostgreSQL data ingestion
 2. Train/test split
 3. Feature engineering
-4. Preprocessing
-5. 5-fold cross-validation
-6. Model comparison
-7. Lasso hyperparameter tuning
-8. Final model selection
-9. Final model training
-10. Model and preprocessor serialization
-11. Report generation
+4. Data preprocessing
+5. Target transformation
+6. 5-fold cross-validation
+7. Baseline model comparison
+8. Lasso hyperparameter tuning
+9. Final model selection
+10. Final model training
+11. Model and preprocessor serialization
+12. Final report generation
 ```
 
-The project uses a dedicated training pipeline that connects the three main components: data ingestion, transformation, and model training.
+The training pipeline coordinates the project's data ingestion, transformation, and model-training components.
 
 ---
 
@@ -515,34 +656,34 @@ After the model artifacts have been generated:
 python app.py
 ```
 
-The application runs on:
+The application runs locally at:
 
 ```text
 http://localhost:5000
 ```
 
-The application loads the saved model and preprocessing pipeline from:
+The Flask application loads:
 
 ```text
 artifacts/model.pkl
 artifacts/preprocessor.pkl
 ```
 
-and uses them to generate predictions.
+and uses them to generate house-price predictions.
 
 ---
 
 # Docker
 
-The project includes a Dockerfile based on Python 3.10.
+The project includes a Dockerfile for containerized execution.
 
-### Build the image
+### Build the Docker Image
 
 ```bash
 docker build -t house-price-prediction .
 ```
 
-### Run the container
+### Run the Container
 
 ```bash
 docker run -p 5000:5000 house-price-prediction
@@ -554,95 +695,114 @@ Then open:
 http://localhost:5000
 ```
 
-The Docker configuration installs the project requirements, copies the project into the container, exposes port `5000`, and starts the Flask application.
+Docker provides a consistent environment for running the Flask prediction application.
 
 ---
 
 # Technologies Used
 
-### Programming Language
+## Programming Language
 
 * Python
 
-### Data Processing
+## Data Processing
 
 * Pandas
 * NumPy
 
-### Machine Learning
+## Machine Learning
 
 * Scikit-learn
 * XGBoost
 * CatBoost
 
-### Database
+## Database
 
 * PostgreSQL
 * SQLAlchemy
 * psycopg2
 
-### Web Development
+## Web Development
 
 * Flask
 
-### Model Serialization
+## Model Serialization
 
 * Dill
 
-### Visualization
+## Visualization
 
 * Matplotlib
 * Seaborn
 
-### DevOps / Engineering
+## DevOps and Engineering
 
 * Docker
 * Git
 * GitHub Actions
 * DVC
 
-The dependency list is defined in `requirements.txt`.
-
 ---
 
 # Engineering Practices
 
-This project follows several practices used in production-oriented ML workflows:
+This project follows several production-oriented machine learning engineering practices:
 
 * Separation of data ingestion, transformation, and model training
-* Reusable feature-engineering function
+* Modular pipeline architecture
+* Reusable feature-engineering logic
 * Persisted preprocessing pipeline
-* Cross-validation instead of relying only on a single split for model selection
+* Consistent preprocessing between training and inference
+* Cross-validation for model selection
 * Hyperparameter tuning
 * Serialized model artifacts
 * Environment-based database configuration
-* Exception handling
-* Logging
+* Logging and exception handling
 * Dockerized application
-* CI workflow
-* Dataset versioning metadata with DVC
+* GitHub Actions CI workflow
+* Dataset versioning metadata using DVC
 
 ---
 
-# Evaluation Notes
+# Evaluation Methodology
 
-The current model-selection process evaluates models using:
+The model-selection process uses:
 
 ```text
-5-Fold Cross-Validation
+Cross-Validation: 5-Fold
 Target: log1p(price)
-Primary metric: R²
+Primary Metric: R²
 ```
 
-Therefore, the reported:
+The final reported cross-validation performance is:
 
 ```text
-CV R² (Log) = 0.6755
+Tuned Lasso CV R² (Log): 0.6755
 ```
 
-should **not** be directly compared with an earlier experiment that reported R² on the original price scale.
+This value represents R² calculated on the **log-transformed target**, not the original house-price scale.
 
-The final model is selected using cross-validation performance and then trained on the complete training split before being evaluated on the held-out test set.
+Therefore, it should not be directly compared with an R² value calculated using untransformed prices.
+
+The baseline Lasso achieved:
+
+```text
+CV R² (Log): 0.6736
+```
+
+After hyperparameter tuning:
+
+```text
+CV R² (Log): 0.6755
+```
+
+Resulting improvement:
+
+```text
++0.0019
+```
+
+The final model is selected based on cross-validation performance and then trained using the selected configuration before being serialized for inference.
 
 ---
 
@@ -650,9 +810,11 @@ The final model is selected using cross-validation performance and then trained 
 
 * The dataset is relatively small compared with real-world property datasets.
 * Predictions depend heavily on the quality and distribution of the training data.
-* The model does not incorporate geographic information such as exact location, neighborhood, latitude, or longitude.
-* Market conditions and changing property prices are not explicitly modeled.
-* The current tuning stage focuses on Lasso after baseline comparison rather than performing exhaustive tuning for every candidate model.
+* The model does not incorporate detailed geographic information such as exact location, neighborhood, latitude, or longitude.
+* Changing housing-market conditions are not explicitly modeled.
+* The current tuning stage focuses on Lasso after baseline model comparison rather than extensively tuning every candidate model.
+* The dataset may not represent current market prices across different regions.
+* Prediction uncertainty is not currently exposed to the user.
 
 ---
 
@@ -662,16 +824,18 @@ Potential improvements include:
 
 * Add location-based features
 * Introduce external housing-market data
-* Compare additional ensemble models
 * Tune XGBoost and CatBoost
-* Add model explainability using SHAP
+* Compare additional ensemble models
+* Add SHAP-based model explainability
 * Add prediction confidence intervals
 * Add automated model monitoring
-* Add automated retraining
-* Add API endpoints in addition to the Flask web interface
+* Add automated model retraining
+* Add REST API endpoints
 * Deploy the application to a cloud platform
-* Add experiment tracking using MLflow
+* Add MLflow experiment tracking
 * Improve CI/CD automation
+* Add automated data validation
+* Add model performance monitoring after deployment
 
 ---
 
@@ -679,11 +843,8 @@ Potential improvements include:
 
 **Aryan Kumar Sahoo**
 
-GitHub:
-https://github.com/Aryan-1105
-
-LinkedIn:
-https://www.linkedin.com/in/aryan-kumar-sahoo/
+* GitHub: `Aryan-1105`
+* LinkedIn: `Aryan Kumar Sahoo`
 
 ---
 
