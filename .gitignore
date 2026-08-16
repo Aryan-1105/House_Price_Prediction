@@ -218,3 +218,13 @@ __marimo__/
 .streamlit/secrets.toml
 
 catboost_info/
+.env.docker
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+.env.docker
+logs/
+notebook/Data/catboost_info/
