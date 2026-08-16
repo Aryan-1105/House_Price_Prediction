@@ -44,7 +44,7 @@ from src.house_price_prediction.utils import save_object
 class ModelTrainerConfig:
     trained_model_file_path: str = os.path.join("artifacts", "model.pkl")
 
-    leaderboard_file_path: str = os.path.join("artifacts", "model_comparison.csv")
+    leaderboard_file_path: str = os.path.join("artifacts", "model_comparison_cv.csv")
 
 
 class ModelTrainer:
@@ -73,7 +73,17 @@ class ModelTrainer:
             logging.info(f"X_test shape: {X_test.shape}")
 
             # =========================================================
-            # 2. Define baseline models
+            # 2. Log-transform target
+            # =========================================================
+
+            y_train_log = np.log1p(y_train)
+
+            y_test_log = np.log1p(y_test)
+
+            logging.info("Target log transformation completed")
+
+            # =========================================================
+            # 3. Define baseline models
             # =========================================================
 
             models = {
@@ -112,7 +122,7 @@ class ModelTrainer:
             }
 
             # =========================================================
-            # 3. 5-Fold Cross Validation
+            # 4. 5-Fold Cross Validation
             # =========================================================
 
             cv = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -126,9 +136,9 @@ class ModelTrainer:
             results = []
 
             print("\n")
-            print("=" * 95)
+            print("=" * 100)
             print("MODEL COMPARISON - 5 FOLD CROSS VALIDATION")
-            print("=" * 95)
+            print("=" * 100)
 
             for model_name, model in models.items():
 
@@ -139,7 +149,7 @@ class ModelTrainer:
                 cv_results = cross_validate(
                     estimator=model,
                     X=X_train,
-                    y=y_train,
+                    y=y_train_log,
                     cv=cv,
                     scoring=scoring,
                     n_jobs=-1,
@@ -160,86 +170,73 @@ class ModelTrainer:
                 results.append(
                     {
                         "Model": model_name,
-                        "CV R2": mean_cv_r2,
+                        "CV R2 (Log)": mean_cv_r2,
                         "CV R2 Std": std_cv_r2,
-                        "CV MAE": mean_cv_mae,
-                        "CV RMSE": mean_cv_rmse,
-                        "Train R2": mean_train_r2,
+                        "CV MAE (Log)": mean_cv_mae,
+                        "CV RMSE (Log)": mean_cv_rmse,
+                        "Train R2 (Log)": mean_train_r2,
                     }
                 )
 
             # =========================================================
-            # 4. Baseline leaderboard
+            # 5. Create CV leaderboard
             # =========================================================
 
             results_df = pd.DataFrame(results)
 
             results_df = results_df.sort_values(
-                by="CV R2", ascending=False
+                by="CV R2 (Log)", ascending=False
             ).reset_index(drop=True)
 
             print("\n")
-            print("=" * 95)
+            print("=" * 100)
             print("BASELINE MODEL LEADERBOARD")
-            print("=" * 95)
+            print("=" * 100)
 
-            print(
-                f"{'Model':<22}"
-                f"{'CV R2':>10}"
-                f"{'Std':>10}"
-                f"{'CV MAE':>16}"
-                f"{'CV RMSE':>16}"
-                f"{'Train R2':>12}"
-            )
+            print(results_df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
 
-            print("-" * 95)
-
-            for _, row in results_df.iterrows():
-
-                print(
-                    f"{row['Model']:<22}"
-                    f"{row['CV R2']:>10.4f}"
-                    f"{row['CV R2 Std']:>10.4f}"
-                    f"{row['CV MAE']:>16,.2f}"
-                    f"{row['CV RMSE']:>16,.2f}"
-                    f"{row['Train R2']:>12.4f}"
-                )
-
-            print("=" * 95)
+            print("=" * 100)
 
             # =========================================================
-            # 5. Tune CatBoost
+            # 6. Identify best baseline model
+            # =========================================================
+
+            best_baseline_row = results_df.iloc[0]
+
+            best_baseline_model_name = best_baseline_row["Model"]
+
+            best_baseline_cv_r2 = best_baseline_row["CV R2 (Log)"]
+
+            print("\n")
+            print("=" * 70)
+            print("BEST BASELINE MODEL")
+            print("=" * 70)
+
+            print(f"Model : {best_baseline_model_name}")
+
+            print(f"CV R2 : {best_baseline_cv_r2:.4f}")
+
+            print("=" * 70)
+
+            # =========================================================
+            # 7. Lasso Hyperparameter Tuning
             # =========================================================
 
             print("\n")
-            print("=" * 95)
-            print("CATBOOST HYPERPARAMETER TUNING")
-            print("=" * 95)
+            print("=" * 100)
+            print("LASSO HYPERPARAMETER TUNING")
+            print("=" * 100)
 
-            logging.info("Starting CatBoost hyperparameter tuning")
+            logging.info("Starting Lasso hyperparameter tuning")
 
-            catboost_model = CatBoostRegressor(
-                loss_function="RMSE",
-                random_seed=42,
-                verbose=False,
-                allow_writing_files=False,
-                thread_count=1,
-            )
+            lasso_model = Lasso(max_iter=10000)
 
-            catboost_param_grid = {
-                "iterations": [200, 300, 500, 700, 1000],
-                "learning_rate": [0.01, 0.02, 0.03, 0.05, 0.08, 0.1],
-                "depth": [3, 4, 5, 6],
-                "l2_leaf_reg": [1, 3, 5, 7, 10, 20],
-                "random_strength": [0, 0.5, 1, 2, 5],
-                "bagging_temperature": [0, 0.5, 1, 2],
-                "border_count": [32, 64, 128],
-            }
+            lasso_param_grid = {"alpha": np.logspace(-5, 1, 50)}
 
-            catboost_search = RandomizedSearchCV(
-                estimator=catboost_model,
-                param_distributions=catboost_param_grid,
-                n_iter=40,
+            lasso_search = RandomizedSearchCV(
+                estimator=lasso_model,
+                param_distributions=lasso_param_grid,
+                n_iter=30,
                 scoring="r2",
                 cv=cv,
                 random_state=42,
@@ -248,69 +245,66 @@ class ModelTrainer:
                 return_train_score=True,
             )
 
-            catboost_search.fit(X_train, y_train)
+            lasso_search.fit(X_train, y_train_log)
 
-            tuned_catboost = catboost_search.best_estimator_
+            tuned_lasso = lasso_search.best_estimator_
 
-            tuned_catboost_cv_r2 = catboost_search.best_score_
+            tuned_lasso_cv_r2 = lasso_search.best_score_
 
-            print("\nBest CatBoost Parameters:")
+            print("\nBest Lasso Parameters:")
 
-            for parameter, value in catboost_search.best_params_.items():
+            for parameter, value in lasso_search.best_params_.items():
                 print(f"{parameter}: {value}")
 
-            print(f"\nBest CatBoost CV R2: " f"{tuned_catboost_cv_r2:.4f}")
+            print(f"\nBest Lasso CV R2: " f"{tuned_lasso_cv_r2:.4f}")
 
-            logging.info(f"Best CatBoost CV R2: " f"{tuned_catboost_cv_r2:.4f}")
+            logging.info(f"Best Lasso CV R2: " f"{tuned_lasso_cv_r2:.4f}")
 
             # =========================================================
-            # 6. Compare baseline CatBoost vs tuned CatBoost
+            # 8. Baseline vs Tuned Lasso
             # =========================================================
 
-            baseline_catboost_cv_r2 = results_df.loc[
-                results_df["Model"] == "CatBoost", "CV R2"
+            baseline_lasso_cv_r2 = results_df.loc[
+                results_df["Model"] == "Lasso Regression", "CV R2 (Log)"
             ].iloc[0]
+
+            improvement = tuned_lasso_cv_r2 - baseline_lasso_cv_r2
 
             print("\n")
             print("-" * 70)
-            print("CATBOOST COMPARISON")
+            print("LASSO TUNING RESULT")
             print("-" * 70)
 
-            print(f"Baseline CatBoost CV R2 : " f"{baseline_catboost_cv_r2:.4f}")
+            print(f"Baseline Lasso CV R2 : " f"{baseline_lasso_cv_r2:.4f}")
 
-            print(f"Tuned CatBoost CV R2    : " f"{tuned_catboost_cv_r2:.4f}")
+            print(f"Tuned Lasso CV R2    : " f"{tuned_lasso_cv_r2:.4f}")
 
-            improvement = tuned_catboost_cv_r2 - baseline_catboost_cv_r2
-
-            print(f"Improvement             : " f"{improvement:+.4f}")
+            print(f"Improvement          : " f"{improvement:+.4f}")
 
             print("-" * 70)
 
             # =========================================================
-            # 7. Select final model
+            # 9. Final model selection
             # =========================================================
 
-            baseline_best_model_name = results_df.iloc[0]["Model"]
+            if (
+                best_baseline_model_name == "Lasso Regression"
+                and tuned_lasso_cv_r2 > baseline_lasso_cv_r2
+            ):
 
-            baseline_best_cv_r2 = results_df.iloc[0]["CV R2"]
+                final_model = tuned_lasso
 
-            if tuned_catboost_cv_r2 > baseline_best_cv_r2:
+                final_model_name = "Tuned Lasso Regression"
 
-                final_model = tuned_catboost
-                final_model_name = "Tuned CatBoost"
-                final_cv_r2 = tuned_catboost_cv_r2
+                final_cv_r2 = tuned_lasso_cv_r2
 
             else:
 
-                final_model = models[baseline_best_model_name]
+                final_model = models[best_baseline_model_name]
 
-                final_model_name = baseline_best_model_name
+                final_model_name = best_baseline_model_name
 
-                final_cv_r2 = baseline_best_cv_r2
-
-            # =========================================================
-            # 8. Train final selected model
-            # =========================================================
+                final_cv_r2 = best_baseline_cv_r2
 
             print("\n")
             print("=" * 70)
@@ -325,85 +319,87 @@ class ModelTrainer:
 
             logging.info(f"Final selected model: " f"{final_model_name}")
 
-            final_model.fit(X_train, y_train)
-
             # =========================================================
-            # 9. Training performance
+            # 10. Train final model
             # =========================================================
 
-            y_train_pred = final_model.predict(X_train)
+            final_model.fit(X_train, y_train_log)
 
-            train_r2 = r2_score(y_train, y_train_pred)
-
-            train_mae = mean_absolute_error(y_train, y_train_pred)
-
-            train_rmse = np.sqrt(mean_squared_error(y_train, y_train_pred))
+            logging.info("Final model fitted successfully")
 
             # =========================================================
-            # 10. Holdout validation performance
+            # 11. Predictions in log space
             # =========================================================
 
-            y_test_pred = final_model.predict(X_test)
+            predicted_log_price_train = final_model.predict(X_train)
 
-            test_r2 = r2_score(y_test, y_test_pred)
-
-            test_mae = mean_absolute_error(y_test, y_test_pred)
-
-            test_rmse = np.sqrt(mean_squared_error(y_test, y_test_pred))
+            predicted_log_price_test = final_model.predict(X_test)
 
             # =========================================================
-            # 11. Final performance report
+            # 12. Convert predictions back to price
+            # =========================================================
+
+            predicted_price_train = np.expm1(predicted_log_price_train)
+
+            predicted_price_test = np.expm1(predicted_log_price_test)
+
+            # =========================================================
+            # 13. Final metrics
+            # =========================================================
+
+            train_r2 = r2_score(y_train, predicted_price_train)
+
+            test_r2 = r2_score(y_test, predicted_price_test)
+
+            train_mae = mean_absolute_error(y_train, predicted_price_train)
+
+            test_mae = mean_absolute_error(y_test, predicted_price_test)
+
+            train_rmse = np.sqrt(mean_squared_error(y_train, predicted_price_train))
+
+            test_rmse = np.sqrt(mean_squared_error(y_test, predicted_price_test))
+
+            # =========================================================
+            # 14. Final performance report
             # =========================================================
 
             print("\n")
-            print("=" * 70)
-            print("FINAL MODEL PERFORMANCE REPORT")
-            print("=" * 70)
+            print("=" * 75)
+            print("FINAL MODEL PERFORMANCE")
+            print("=" * 75)
 
-            print(f"Selected Model    : " f"{final_model_name}")
+            print(f"Model        : " f"{final_model_name}")
 
-            print("-" * 70)
+            print(f"CV R2        : " f"{final_cv_r2:.4f}")
 
-            print(f"CV R2             : " f"{final_cv_r2:.4f}")
+            print(f"Train R2     : " f"{train_r2:.4f}")
 
-            print(f"Train R2          : " f"{train_r2:.4f}")
+            print(f"Test R2      : " f"{test_r2:.4f}")
 
-            print(f"Validation R2     : " f"{test_r2:.4f}")
+            print(f"Train MAE    : " f"₹{train_mae:,.2f}")
 
-            print("-" * 70)
+            print(f"Test MAE     : " f"₹{test_mae:,.2f}")
 
-            print(f"Train MAE         : " f"{train_mae:,.2f}")
+            print(f"Train RMSE   : " f"₹{train_rmse:,.2f}")
 
-            print(f"Validation MAE    : " f"{test_mae:,.2f}")
+            print(f"Test RMSE    : " f"₹{test_rmse:,.2f}")
 
-            print("-" * 70)
-
-            print(f"Train RMSE        : " f"{train_rmse:,.2f}")
-
-            print(f"Validation RMSE   : " f"{test_rmse:,.2f}")
-
-            print("=" * 70)
+            print("=" * 75)
 
             # =========================================================
-            # 12. Save leaderboard
+            # 15. Save leaderboard
             # =========================================================
 
             os.makedirs("artifacts", exist_ok=True)
-
-            results_df["Tuned CatBoost CV R2"] = np.nan
-
-            results_df.loc[
-                results_df["Model"] == "CatBoost", "Tuned CatBoost CV R2"
-            ] = tuned_catboost_cv_r2
 
             results_df.to_csv(
                 self.model_trainer_config.leaderboard_file_path, index=False
             )
 
-            logging.info("Model leaderboard saved")
+            logging.info("CV leaderboard saved successfully")
 
             # =========================================================
-            # 13. Save final model
+            # 16. Save model
             # =========================================================
 
             save_object(
@@ -414,12 +410,12 @@ class ModelTrainer:
             logging.info("Final model saved successfully")
 
             print(
-                f"\nBest model saved: "
+                "\nFinal model saved: "
                 f"{self.model_trainer_config.trained_model_file_path}"
             )
 
             print(
-                f"Leaderboard saved: "
+                "Leaderboard saved: "
                 f"{self.model_trainer_config.leaderboard_file_path}"
             )
 

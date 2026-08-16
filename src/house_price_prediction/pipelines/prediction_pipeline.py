@@ -1,16 +1,14 @@
 import sys
 
+import numpy as np
 import pandas as pd
 
 from src.house_price_prediction.exception import CustomException
 from src.house_price_prediction.utils import load_object
+from src.house_price_prediction.feature_engineering import add_features
+
 
 class CustomData:
-    """
-    Takes individual house feature values (e.g. from a web form)
-    and converts them into a pandas DataFrame with the same column
-    names used during training, so the preprocessor can handle it.
-    """
 
     def __init__(
         self,
@@ -27,11 +25,13 @@ class CustomData:
         prefarea: str,
         furnishingstatus: str,
     ):
+
         self.area = area
         self.bedrooms = bedrooms
         self.bathrooms = bathrooms
         self.stories = stories
         self.parking = parking
+
         self.mainroad = mainroad
         self.guestroom = guestroom
         self.basement = basement
@@ -41,13 +41,9 @@ class CustomData:
         self.furnishingstatus = furnishingstatus
 
     def get_data_as_dataframe(self):
-        """
-        Builds a single-row DataFrame from the stored values.
-        Column names and order don't have to match the preprocessor's
-        internal order exactly (ColumnTransformer selects by name),
-        but the NAMES must match exactly.
-        """
+
         try:
+
             custom_data_input_dict = {
                 "area": [self.area],
                 "bedrooms": [self.bedrooms],
@@ -66,29 +62,56 @@ class CustomData:
             return pd.DataFrame(custom_data_input_dict)
 
         except Exception as e:
+
             raise CustomException(e, sys)
-        
+
+
 class PredictPipeline:
-    """
-    Loads the trained model and preprocessor from disk,
-    then uses them to predict the price for new house data.
-    """
 
     def __init__(self):
+
         self.model_path = "artifacts/model.pkl"
+
         self.preprocessor_path = "artifacts/preprocessor.pkl"
 
     def predict(self, features: pd.DataFrame):
+
         try:
+
+            # ==========================================
+            # Load trained objects
+            # ==========================================
+
             model = load_object(file_path=self.model_path)
+
             preprocessor = load_object(file_path=self.preprocessor_path)
 
-            # Apply the SAME transformation used during training
-            data_scaled = preprocessor.transform(features)
+            # ==========================================
+            # Apply feature engineering
+            # ==========================================
 
-            prediction = model.predict(data_scaled)
+            features = add_features(features)
 
-            return prediction
+            # ==========================================
+            # Apply preprocessing
+            # ==========================================
+
+            transformed_data = preprocessor.transform(features)
+
+            # ==========================================
+            # Predict log(price)
+            # ==========================================
+
+            predicted_log_price = model.predict(transformed_data)
+
+            # ==========================================
+            # Convert back to original price
+            # ==========================================
+
+            predicted_price = np.expm1(predicted_log_price)
+
+            return predicted_price
 
         except Exception as e:
+
             raise CustomException(e, sys)
