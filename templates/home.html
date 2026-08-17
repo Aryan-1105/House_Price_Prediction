@@ -2,77 +2,202 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>House Price Prediction</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
 
     <div class="container">
+
         <h1>House Price Prediction</h1>
 
         <form action="{{ url_for('predict_price') }}" method="POST">
 
-            <label for="area">Area (sq ft)</label>
-            <input type="number" id="area" name="area" required>
+            <!-- Area -->
+            <div class="field">
+                <div class="label-row">
+                    <label for="area">Area (sq ft)</label>
+                    <span class="range">1,650 – 16,200</span>
+                </div>
 
-            <label for="bedrooms">Bedrooms</label>
-            <input type="number" id="bedrooms" name="bedrooms" required>
+                <input
+                    type="number"
+                    id="area"
+                    name="area"
+                    min="1650"
+                    max="16200"
+                    step="1"
+                    placeholder="Enter area"
+                    required
+                >
+            </div>
 
-            <label for="bathrooms">Bathrooms</label>
-            <input type="number" id="bathrooms" name="bathrooms" required>
 
-            <label for="stories">Stories</label>
-            <input type="number" id="stories" name="stories" required>
+            <!-- Bedrooms -->
+            <div class="field">
+                <div class="label-row">
+                    <label for="bedrooms">Bedrooms</label>
+                    <span class="range">1 – 6</span>
+                </div>
 
-            <label for="parking">Parking Spaces</label>
-            <input type="number" id="parking" name="parking" required>
+                <input
+                    type="number"
+                    id="bedrooms"
+                    name="bedrooms"
+                    min="1"
+                    max="6"
+                    step="1"
+                    placeholder="Enter bedrooms"
+                    required
+                >
+            </div>
 
-            <label for="mainroad">Main Road Access</label>
-            <select id="mainroad" name="mainroad" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
 
-            <label for="guestroom">Guest Room</label>
-            <select id="guestroom" name="guestroom" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
+            <!-- Bathrooms -->
+            <div class="field">
+                <div class="label-row">
+                    <label for="bathrooms">Bathrooms</label>
+                    <span class="range">1 – 4</span>
+                </div>
 
-            <label for="basement">Basement</label>
-            <select id="basement" name="basement" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
+                <input
+                    type="number"
+                    id="bathrooms"
+                    name="bathrooms"
+                    min="1"
+                    max="4"
+                    step="1"
+                    placeholder="Enter bathrooms"
+                    required
+                >
+            </div>
 
-            <label for="hotwaterheating">Hot Water Heating</label>
-            <select id="hotwaterheating" name="hotwaterheating" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
 
-            <label for="airconditioning">Air Conditioning</label>
-            <select id="airconditioning" name="airconditioning" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
+            <!-- Stories -->
+            <div class="field">
+                <div class="label-row">
+                    <label for="stories">Stories</label>
+                    <span class="range">1 – 4</span>
+                </div>
 
-            <label for="prefarea">Preferred Area</label>
-            <select id="prefarea" name="prefarea" required>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
+                <input
+                    type="number"
+                    id="stories"
+                    name="stories"
+                    min="1"
+                    max="4"
+                    step="1"
+                    placeholder="Enter stories"
+                    required
+                >
+            </div>
 
-            <label for="furnishingstatus">Furnishing Status</label>
-            <select id="furnishingstatus" name="furnishingstatus" required>
-                <option value="furnished">Furnished</option>
-                <option value="semi-furnished">Semi-Furnished</option>
-                <option value="unfurnished">Unfurnished</option>
-            </select>
+
+            <!-- Parking -->
+            <div class="field">
+                <div class="label-row">
+                    <label for="parking">Parking Spaces</label>
+                    <span class="range">0 – 3</span>
+                </div>
+
+                <input
+                    type="number"
+                    id="parking"
+                    name="parking"
+                    min="0"
+                    max="3"
+                    step="1"
+                    placeholder="Enter parking spaces"
+                    required
+                >
+            </div>
+
+
+            <!-- Main Road -->
+            <div class="field">
+                <label for="mainroad">Main Road Access</label>
+
+                <select id="mainroad" name="mainroad" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Guest Room -->
+            <div class="field">
+                <label for="guestroom">Guest Room</label>
+
+                <select id="guestroom" name="guestroom" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Basement -->
+            <div class="field">
+                <label for="basement">Basement</label>
+
+                <select id="basement" name="basement" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Hot Water Heating -->
+            <div class="field">
+                <label for="hotwaterheating">Hot Water Heating</label>
+
+                <select id="hotwaterheating" name="hotwaterheating" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Air Conditioning -->
+            <div class="field">
+                <label for="airconditioning">Air Conditioning</label>
+
+                <select id="airconditioning" name="airconditioning" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Preferred Area -->
+            <div class="field">
+                <label for="prefarea">Preferred Area</label>
+
+                <select id="prefarea" name="prefarea" required>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+
+            <!-- Furnishing Status -->
+            <div class="field">
+                <label for="furnishingstatus">Furnishing Status</label>
+
+                <select id="furnishingstatus" name="furnishingstatus" required>
+                    <option value="furnished">Furnished</option>
+                    <option value="semi-furnished">Semi-Furnished</option>
+                    <option value="unfurnished">Unfurnished</option>
+                </select>
+            </div>
+
 
             <button type="submit">Predict Price</button>
 
         </form>
+
     </div>
 
 </body>
